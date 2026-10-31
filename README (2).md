@@ -3,7 +3,7 @@
 **Real-Time Violation Notification (RTVN) & High-Speed Interception Protocol (HSIP)**  
 *Developed for the Viksit Bharat Young Leaders Dialogue (VBYLD) 2027 — Hack for Social Cause*
 
-* **System Architect & Lead Developer:** Het Ishwarbhai Prajapati (Enrollment: 2302030300002)
+* **System Architect & Lead Developer:** Het Ishwarbhai Prajapati
 * **Research Co-Lead & Policy Integration:** Dhruv Thumar
 * **Institution:** Department of Civil Engineering, Silver Oak University, Ahmedabad, Gujarat
 
