@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTVN & HSIP | Architecture by Het Prajapati</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; background-color: #F1F5F9; color: #0F172A; }
+        .mono { font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace; font-variant-numeric: tabular-nums; }
+        .panel-border { border: 1px solid #CBD5E1; }
+        .pulse-amber { animation: pulseAmber 1.5s infinite; }
+        @keyframes pulseAmber {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.35); }
+            50% { box-shadow: 0 0 0 6px rgba(217, 119, 6, 0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Clean Minimal Top Header -->
+    <header class="bg-[#0F172A] text-white px-5 py-3 border-b border-slate-700 flex flex-wrap justify-between items-center gap-3 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-2.5 h-8 bg-blue-500 rounded-sm"></div>
+            <div>
+                <div class="flex items-center gap-2.5">
+                    <h1 class="text-lg font-bold tracking-wider">RTVN &amp; HSIP</h1>
+                    <span class="text-[11px] uppercase tracking-wider bg-slate-800 text-blue-300 border border-slate-600 px-2 py-0.5 rounded font-semibold">
+                        Virtual Corridor Simulation Environment
+                    </span>
+                </div>
+                <p class="text-xs text-slate-400">Real-Time Violation Notification &amp; High-Speed Interception Protocol</p>
+            </div>
+        </div>
+
+        <!-- Corridor, Weather & Language Controls -->
+        <div class="flex flex-wrap items-center gap-2.5 text-xs">
+            <div class="flex items-center bg-slate-800 border border-slate-600 rounded px-2.5 py-1.5">
+                <span class="text-slate-400 mr-2 font-medium">Corridor Geometry:</span>
+                <select id="corridorSelect" onchange="updateCorridorConfig()" class="bg-transparent text-white font-semibold focus:outline-none cursor-pointer">
+                    <option value="500" class="bg-slate-900">Urban Road (Node Spacing: 500 m)</option>
+                    <option value="1000" class="bg-slate-900">High-Speed Highway (Node Spacing: 1,000 m / 1 km)</option>
+                </select>
+            </div>
+
+            <div class="flex items-center bg-slate-800 border border-slate-600 rounded px-2.5 py-1.5">
+                <span class="text-slate-400 mr-2 font-medium">IRC:73 Surface:</span>
+                <select id="weatherSelect" onchange="updateWeatherConfig()" class="bg-transparent text-white font-semibold focus:outline-none cursor-pointer">
+                    <option value="dry" class="bg-slate-900">Dry Asphalt (f = 0.35 | Limit: 60 km/h)</option>
+                    <option value="wet" class="bg-slate-900">Monsoon Wet (f = 0.18 | Limit: 42 km/h)</option>
+                </select>
+            </div>
+
+            <div class="flex items-center bg-slate-800 border border-slate-600 rounded px-2.5 py-1.5">
+                <span class="text-slate-400 mr-2 font-medium">Voice Alert:</span>
+                <select id="langSelect" class="bg-transparent text-white font-semibold focus:outline-none cursor-pointer">
+                    <option value="en-IN" class="bg-slate-900">English (IN)</option>
+                    <option value="hi-IN" class="bg-slate-900">Hindi (हिन्दी)</option>
+                    <option value="gu-IN" class="bg-slate-900">Gujarati (ગુજરાતી)</option>
+                </select>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 max-w-[1600px] w-full mx-auto">
+
+        <!-- LEFT COLUMN (7 Cols): Virtual 3-Node Corridor Canvas + Admin Database + Node 3 Officer Gate -->
+        <section class="lg:col-span-7 flex flex-col gap-4">
+
+            <!-- Card 1: Interactive 3-Node Virtual Corridor Visualizer -->
+            <div class="bg-white panel-border rounded shadow-sm p-4">
+                <div class="flex flex-wrap justify-between items-center gap-2 pb-3 mb-3 border-b border-slate-200">
+                    <div>
+                        <h2 class="text-sm font-bold uppercase tracking-wider text-slate-800">3-Node Virtual Highway Telemetry Simulator</h2>
+                        <p class="text-xs text-slate-500" id="corridorSubtext">
+                            Active Spacing: Node 1 &rarr; Node 2 (500 m) &rarr; Node 3 Confirmation Gate (500 m) | Total: 1,000 m
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-100 border border-slate-300 mono" id="limitBadge">
+                            Enforced Limit: 60 km/h
+                        </span>
+                        <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 mono" id="ssdBadge">
+                            IRC:73 SSD: 82.1 m
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Jury Scenario Simulation Buttons -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+                    <button onclick="startScenario(1)" class="text-left p-2.5 rounded border border-emerald-300 bg-emerald-50/70 hover:bg-emerald-100 transition">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-emerald-900">Scenario 1: Self-Rectification</span>
+                            <span class="text-[10px] font-bold bg-emerald-700 text-white px-1.5 py-0.5 rounded">LEVEL 1</span>
+                        </div>
+                        <p class="text-[11px] text-emerald-800 mt-1">Speeds at Node 1 (76 km/h) &rarr; Slows by Node 2 (52 km/h) &rarr; ₹0 Fine</p>
+                    </button>
+
+                    <button onclick="startScenario(2)" class="text-left p-2.5 rounded border border-amber-300 bg-amber-50/70 hover:bg-amber-100 transition">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-amber-900">Scenario 2: Persistent Violator</span>
+                            <span class="text-[10px] font-bold bg-amber-600 text-white px-1.5 py-0.5 rounded">LEVEL 2</span>
+                        </div>
+                        <p class="text-[11px] text-amber-800 mt-1">Ignores Node 1 Alert (78 &rarr; 84 km/h) &rarr; Pauses at Node 3 for Officer</p>
+                    </button>
+
+                    <button onclick="startScenario(3)" class="text-left p-2.5 rounded border border-red-300 bg-red-50/70 hover:bg-red-100 transition">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-red-900">Scenario 3: Extreme Speed / DUI</span>
+                            <span class="text-[10px] font-bold bg-red-700 text-white px-1.5 py-0.5 rounded">LEVEL 3 HSIP</span>
+                        </div>
+                        <p class="text-[11px] text-red-800 mt-1">108 km/h + Severe Lane Weave (SDLP 0.61m) &rarr; Node 3 Officer Interception</p>
+                    </button>
+                </div>
+
+                <!-- HTML5 Canvas: Top-Down 3-Node Corridor -->
+                <div class="relative rounded overflow-hidden border border-slate-800 bg-[#0B1120]">
+                    <canvas id="corridorCanvas" width="820" height="215" class="w-full h-[215px] block"></canvas>
+                </div>
+
+                <!-- Live Physics Telemetry Strip -->
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-3 pt-2 border-t border-slate-100 text-xs">
+                    <div class="bg-slate-50 p-2 rounded border border-slate-200">
+                        <div class="text-[10px] uppercase text-slate-400 font-semibold">Active Vehicle</div>
+                        <div class="font-bold mono text-slate-800 mt-0.5" id="telPlate">GJ-01-HX-4821</div>
+                    </div>
+                    <div class="bg-slate-50 p-2 rounded border border-slate-200">
+                        <div class="text-[10px] uppercase text-slate-400 font-semibold">Instant Velocity</div>
+                        <div class="font-bold mono text-slate-800 mt-0.5" id="telSpeed">0.0 km/h</div>
+                    </div>
+                    <div class="bg-slate-50 p-2 rounded border border-slate-200">
+                        <div class="text-[10px] uppercase text-slate-400 font-semibold">Lateral Weave (SDLP)</div>
+                        <div class="font-bold mono text-slate-800 mt-0.5" id="telSdlp">0.08 m (Normal)</div>
+                    </div>
+                    <div class="bg-slate-50 p-2 rounded border border-slate-200">
+                        <div class="text-[10px] uppercase text-slate-400 font-semibold">Surrogate TTC / DRAC</div>
+                        <div class="font-bold mono text-slate-800 mt-0.5" id="telSsm">4.8s / 0.9 m/s²</div>
+                    </div>
+                    <div class="bg-slate-50 p-2 rounded border border-slate-200">
+                        <div class="text-[10px] uppercase text-slate-400 font-semibold">Node 3 Signal State</div>
+                        <div class="font-bold mono text-emerald-700 mt-0.5" id="telSignal">GREEN (NORMAL)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2: Node 3 Human Officer Confirmation Console -->
+            <div id="node3GateCard" class="bg-white panel-border rounded shadow-sm p-4 border-l-4 border-l-slate-400 transition-all">
+                <div class="flex justify-between items-center mb-2">
+                    <div class="flex items-center gap-2">
+                        <span id="gateStatusDot" class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                        <h3 class="text-sm font-bold uppercase tracking-wider text-slate-800">
+                            Node 3 Human Officer Confirmation Console
+                        </h3>
+                    </div>
+                    <span id="gateBadge" class="text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 mono">
+                        STANDBY — NO UNRECTIFIED CASE
+                    </span>
+                </div>
+                <p id="gateDescription" class="text-xs text-slate-600 mb-3">
+                    Node 1 initial violation alerts and Node 2 self-rectification confirmations are pushed automatically in real time. If a violator fails to rectify by Node 2, the case pauses here at Node 3 for mandatory human officer verification before issuing penalties or physical interception.
+                </p>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <button id="btnConfirmL2" disabled onclick="officerConfirm('LEVEL_2')" class="py-2 px-3 rounded text-xs font-bold border border-amber-500 bg-amber-500 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-amber-600 transition">
+                        Confirm Level 2 (₹2,000 Challan + 3 Pts)
+                    </button>
+                    <button id="btnConfirmL3" disabled onclick="officerConfirm('LEVEL_3')" class="py-2 px-3 rounded text-xs font-bold border border-red-600 bg-red-600 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-red-700 transition">
+                        Confirm Level 3 HSIP (Patrol + RED Signal)
+                    </button>
+                    <button id="btnDismiss" disabled onclick="officerConfirm('DISMISS')" class="py-2 px-3 rounded text-xs font-bold border border-slate-300 bg-slate-100 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 transition">
+                        Dismiss / Override Case
+                    </button>
+                </div>
+            </div>
+
+            <!-- Card 3: Real-Time Admin Enforcement Database Table -->
+            <div class="bg-white panel-border rounded shadow-sm p-4 flex-1 flex flex-col">
+                <div class="flex justify-between items-center pb-2.5 mb-2.5 border-b border-slate-200">
+                    <div>
+                        <h3 class="text-sm font-bold uppercase tracking-wider text-slate-800">Real-Time Admin Enforcement Ledger</h3>
+                        <p class="text-[11px] text-slate-500">Synchronized with BSA 2023 Section 63 Cryptographic SHA-256 Evidence Hash</p>
+                    </div>
+                    <button onclick="clearLedger()" class="text-xs text-slate-500 hover:text-slate-800 border border-slate-300 rounded px-2 py-1">
+                        Reset Log
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 border-b border-slate-300 uppercase text-[10px]">
+                                <th class="py-2 px-2.5">Case ID</th>
+                                <th class="py-2 px-2.5">Plate</th>
+                                <th class="py-2 px-2.5">Node 1 &rarr; Node 2</th>
+                                <th class="py-2 px-2.5">Level / Status</th>
+                                <th class="py-2 px-2.5">Node 3 Officer Action</th>
+                                <th class="py-2 px-2.5">BSA SHA-256 Hash</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ledgerBody" class="divide-y divide-slate-200 mono text-[11px]">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- RIGHT COLUMN (5 Cols): Split-Screen Real-Time Violator Notification Terminal -->
+        <section class="lg:col-span-5 flex flex-col gap-4">
+
+            <div class="bg-white panel-border rounded shadow-sm p-4 flex-1 flex flex-col">
+                <div class="flex justify-between items-center pb-3 mb-3 border-b border-slate-200">
+                    <div>
+                        <h2 class="text-sm font-bold uppercase tracking-wider text-slate-800">
+                            Split-Screen Violator Notification Receiver
+                        </h2>
+                        <p class="text-xs text-slate-500">
+                            In-Vehicle Infotainment / Smartphone Push Terminal (Real-Time Voice + Detailed Text)
+                        </p>
+                    </div>
+                    <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                        LIVE LINK
+                    </span>
+                </div>
+
+                <!-- Active Alert Banner -->
+                <div id="violatorBanner" class="rounded p-3.5 mb-4 border bg-slate-900 text-white border-slate-700 transition-all">
+                    <div class="flex justify-between items-center text-[11px] uppercase tracking-wider text-slate-400 mb-1">
+                        <span id="violatorStageTag">CHANNEL READY — MONITORING CORRIDOR</span>
+                        <span id="violatorTimeTag" class="mono">--:--:-- IST</span>
+                    </div>
+                    <div class="text-base font-bold tracking-wide" id="violatorHeadline">
+                        Select a Virtual Scenario on the Left to Trigger Real-Time Dispatch
+                    </div>
+                </div>
+
+                <!-- 1. Live Voice Alert Transcript Box -->
+                <div class="mb-4">
+                    <div class="flex justify-between items-center mb-1.5">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-600">
+                            1. Instantaneous Hands-Free Voice Alert (TTS)
+                        </span>
+                        <button onclick="replayLastVoice()" class="text-[11px] font-semibold text-blue-700 hover:underline">
+                            Replay Audio
+                        </button>
+                    </div>
+                    <div class="bg-slate-50 border border-slate-300 rounded p-3.5 min-h-[78px] flex items-center">
+                        <p id="voiceTranscript" class="text-sm italic text-slate-800 leading-relaxed">
+                            "Awaiting vehicle entry at Camera Node 1..."
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 2. Simultaneous Detailed Written Message Box -->
+                <div class="flex-1 flex flex-col">
+                    <div class="flex justify-between items-center mb-1.5">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-600">
+                            2. Simultaneous Detailed Violation &amp; Rectification Notice
+                        </span>
+                        <span class="text-[11px] mono text-slate-500" id="ackLatency">ACK Latency: 42 ms</span>
+                    </div>
+                    <div class="bg-[#0F172A] text-slate-100 rounded border border-slate-800 p-4 flex-1 mono text-xs leading-relaxed whitespace-pre-line" id="detailedNoticeBox">
+[SYSTEM STANDBY]
+• Node 1 (0 m): Automated Detection &amp; Immediate Violator Alert
+• Node 2 (500 m / 1 km): Automated Compliance Verification (₹0 Fine if Rectified)
+• Node 3 (1,000 m / 2 km): Human Officer Confirmation Gate for Unrectified Violations
+                    </div>
+                </div>
+
+                <!-- Mathematical & Architecture Reference Box for Jury Clarity -->
+                <div class="mt-4 pt-3 border-t border-slate-200 bg-slate-50 rounded p-3 text-[11px] text-slate-600 space-y-1">
+                    <div class="font-bold text-slate-800 uppercase tracking-wider text-[10px]">
+                        Embedded Civil &amp; Transportation Engineering Engine
+                    </div>
+                    <div>
+                        &bull; <strong>IRC:35 Projective Homography:</strong> Maps 3.0 m lane dashes &amp; 4.5 m gaps to compute velocity ($v = \Delta d / \Delta t$) and lateral weave ($SDLP$).
+                    </div>
+                    <div>
+                        &bull; <strong>IRC:73 Stopping Sight Distance:</strong> $SSD = 0.278 \cdot v \cdot t_r + v^2 / (254 \cdot f)$ adapts speed limits to road friction.
+                    </div>
+                    <div>
+                        &bull; <strong>3-Node Escalation Protocol:</strong> Node 1 &amp; Node 2 execute automated real-time notifications; Node 3 enforces human-in-the-loop officer confirmation.
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Minimal, Discrete Footer Exclusive to Het Prajapati -->
+    <footer class="bg-white border-t border-slate-300 px-5 py-2.5 text-center text-xs text-slate-500 shrink-0">
+        &copy; 2026 Het Prajapati. All Rights Reserved. System Architecture &amp; Engineering by Het Prajapati.
+    </footer>
+
+    <script>
+        const canvas = document.getElementById('corridorCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let corridorMeters = 500;
+        let weatherMode = 'dry';
+        let frictionF = 0.35;
+        let speedLimit = 60;
+        let lastSpokenText = '';
+        let animFrame = null;
+        let caseCounter = 101;
+
+        // Active vehicle state on the 3-Node canvas
+        let vehicle = {
+            active: false,
+            scenario: 1,
+            plate: 'GJ-01-HX-4821',
+            x: 30,
+            y: 108,
+            baseY: 108,
+            speedKmh: 0,
+            node1Speed: 0,
+            node2Speed: 0,
+            sdlp: 0.09,
+            ttc: 4.8,
+            drac: 0.8,
+            stage: 0, // 0=approaching N1, 1=between N1-N2, 2=between N2-N3, 3=paused at N3, 4=completed
+            node3Signal: 'GREEN',
+            caseId: 'HET-2027-0101'
+        };
+
+        const NODE1_X = 150;
+        const NODE2_X = 430;
+        const NODE3_X = 700;
+
+        function computeSSD(vKmh, f) {
+            const tr = 2.5;
+            return (0.278 * vKmh * tr + (vKmh * vKmh) / (254 * f)).toFixed(1);
+        }
+
+        async function sha256Hex(text) {
+            const buf = new TextEncoder().encode(text);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', buf);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function updateCorridorConfig() {
+            corridorMeters = parseInt(document.getElementById('corridorSelect').value, 10);
+            const totalM = corridorMeters * 2;
+            const label = corridorMeters === 1000 ? '1,000 m (1 km)' : '500 m';
+            document.getElementById('corridorSubtext').innerHTML =
+                `Active Spacing: Node 1 &rarr; Node 2 (${label}) &rarr; Node 3 Confirmation Gate (${label}) | Total Corridor: ${totalM.toLocaleString()} m`;
+            drawCorridor();
+        }
+
+        function updateWeatherConfig() {
+            weatherMode = document.getElementById('weatherSelect').value;
+            if (weatherMode === 'wet') {
+                frictionF = 0.18;
+                speedLimit = 42;
+            } else {
+                frictionF = 0.35;
+                speedLimit = 60;
+            }
+            const ssd = computeSSD(speedLimit, frictionF);
+            document.getElementById('limitBadge').innerText = `Enforced Limit: ${speedLimit} km/h`;
+            document.getElementById('ssdBadge').innerText = `IRC:73 SSD: ${ssd} m`;
+            drawCorridor();
+        }
+
+        function speakAlert(text) {
+            lastSpokenText = text;
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utter = new SpeechSynthesisUtterance(text);
+                utter.lang = document.getElementById('langSelect').value || 'en-IN';
+                utter.rate = 1.02;
+                window.speechSynthesis.speak(utter);
+            }
+        }
+
+        function replayLastVoice() {
+            if (lastSpokenText) speakAlert(lastSpokenText);
+        }
+
+        function setViolatorDisplay(stageText, headline, bannerColor, voiceText, detailedText) {
+            const banner = document.getElementById('violatorBanner');
+            banner.className = `rounded p-3.5 mb-4 border transition-all ${bannerColor}`;
+            document.getElementById('violatorStageTag').innerText = stageText;
+            document.getElementById('violatorTimeTag').innerText = new Date().toLocaleTimeString() + ' IST';
+            document.getElementById('violatorHeadline').innerText = headline;
+            document.getElementById('voiceTranscript').innerText = `"${voiceText}"`;
+            document.getElementById('detailedNoticeBox').innerText = detailedText;
+            speakAlert(voiceText);
+        }
+
+        function setNode3Gate(active, summaryText) {
+            const card = document.getElementById('node3GateCard');
+            const dot = document.getElementById('gateStatusDot');
+            const badge = document.getElementById('gateBadge');
+            const desc = document.getElementById('gateDescription');
+            const b2 = document.getElementById('btnConfirmL2');
+            const b3 = document.getElementById('btnConfirmL3');
+            const bd = document.getElementById('btnDismiss');
+
+            if (active) {
+                card.className = 'bg-amber-50/60 panel-border rounded shadow-sm p-4 border-l-4 border-l-amber-500 pulse-amber transition-all';
+                dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping';
+                badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 mono';
+                badge.innerText = 'AWAITING NODE 3 HUMAN OFFICER CONFIRMATION';
+                desc.innerText = summaryText;
+                b2.disabled = false;
+                b3.disabled = false;
+                bd.disabled = false;
+            } else {
+                card.className = 'bg-white panel-border rounded shadow-sm p-4 border-l-4 border-l-slate-400 transition-all';
+                dot.className = 'w-2.5 h-2.5 rounded-full bg-slate-400';
+                badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 mono';
+                badge.innerText = 'STANDBY — NO UNRECTIFIED CASE';
+                desc.innerText = 'Node 1 initial violation alerts and Node 2 self-rectification confirmations are pushed automatically in real time. If a violator fails to rectify by Node 2, the case pauses here at Node 3 for mandatory human officer verification.';
+                b2.disabled = true;
+                b3.disabled = true;
+                bd.disabled = true;
+            }
+        }
+
+        async function appendOrUpdateLedger(caseId, plate, speedsText, levelBadgeHtml, officerActionText) {
+            const hash = await sha256Hex(`${caseId}|${plate}|${speedsText}|${officerActionText}|${Date.now()}`);
+            const shortHash = hash.substring(0, 14) + '...';
+            const tbody = document.getElementById('ledgerBody');
+            let existing = document.getElementById(`row-${caseId}`);
+            const rowHtml = `
+                <td class="py-2 px-2.5 font-bold text-slate-800">${caseId}</td>
+                <td class="py-2 px-2.5 font-semibold">${plate}</td>
+                <td class="py-2 px-2.5">${speedsText}</td>
+                <td class="py-2 px-2.5">${levelBadgeHtml}</td>
+                <td class="py-2 px-2.5 font-sans text-slate-700">${officerActionText}</td>
+                <td class="py-2 px-2.5 text-slate-500" title="${hash}">${shortHash}</td>
+            `;
+            if (existing) {
+                existing.innerHTML = rowHtml;
+            } else {
+                const tr = document.createElement('tr');
+                tr.id = `row-${caseId}`;
+                tr.className = 'hover:bg-slate-50';
+                tr.innerHTML = rowHtml;
+                tbody.prepend(tr);
+            }
+        }
+
+        function clearLedger() {
+            document.getElementById('ledgerBody').innerHTML = '';
+        }
+
+        function startScenario(scenNum) {
+            if (animFrame) cancelAnimationFrame(animFrame);
+            setNode3Gate(false, '');
+
+            caseCounter++;
+            const cId = `HET-2027-0${caseCounter}`;
+
+            if (scenNum === 1) {
+                vehicle = {
+                    active: true, scenario: 1, plate: 'GJ-01-HX-4821',
+                    x: 35, y: 108, baseY: 108,
+                    speedKmh: 76.4, node1Speed: 76.4, node2Speed: 52.0,
+                    sdlp: 0.11, ttc: 3.9, drac: 1.1,
+                    stage: 0, node3Signal: 'GREEN', caseId: cId
+                };
+            } else if (scenNum === 2) {
+                vehicle = {
+                    active: true, scenario: 2, plate: 'GJ-01-KP-9012',
+                    x: 35, y: 108, baseY: 108,
+                    speedKmh: 78.5, node1Speed: 78.5, node2Speed: 84.2,
+                    sdlp: 0.24, ttc: 2.3, drac: 2.6,
+                    stage: 0, node3Signal: 'GREEN', caseId: cId
+                };
+            } else {
+                vehicle = {
+                    active: true, scenario: 3, plate: 'GJ-27-TC-7740',
+                    x: 35, y: 108, baseY: 108,
+                    speedKmh: 108.0, node1Speed: 108.0, node2Speed: 111.5,
+                    sdlp: 0.61, ttc: 1.1, drac: 5.4,
+                    stage: 0, node3Signal: 'GREEN', caseId: cId
+                };
+            }
+
+            updateTelemetryStrip();
+            animateCorridor();
+        }
+
+        function updateTelemetryStrip() {
+            document.getElementById('telPlate').innerText = vehicle.plate;
+            document.getElementById('telSpeed').innerText = `${vehicle.speedKmh.toFixed(1)} km/h`;
+            document.getElementById('telSdlp').innerText =
+                vehicle.sdlp >= 0.45 ? `${vehicle.sdlp.toFixed(2)} m (DUI WEAVE)` : `${vehicle.sdlp.toFixed(2)} m (Normal)`;
+            document.getElementById('telSsm').innerText = `${vehicle.ttc}s / ${vehicle.drac} m/s²`;
+            const sigEl = document.getElementById('telSignal');
+            if (vehicle.node3Signal === 'RED') {
+                sigEl.innerText = 'PREEMPTED RED (HSIP)';
+                sigEl.className = 'font-bold mono text-red-600 mt-0.5';
+            } else {
+                sigEl.innerText = 'GREEN (NORMAL)';
+                sigEl.className = 'font-bold mono text-emerald-700 mt-0.5';
+            }
+        }
+
+        function triggerNode1Event() {
+            const distLabel = corridorMeters === 1000 ? '1,000 m (1 km)' : '500 m';
+            const ssdReq = computeSSD(vehicle.node1Speed, frictionF);
+
+            const voice = `Attention driver of vehicle ${vehicle.plate}. Violation detected at Camera Node 1 at ${Math.round(vehicle.node1Speed)} kilometers per hour. Enforced limit is ${speedLimit}. Decelerate before Camera Node 2, ${distLabel} ahead, to qualify for zero fine.`;
+
+            const detailed =
+`[REAL-TIME VIOLATION NOTIFICATION — CAMERA NODE 1]
+Case ID          : ${vehicle.caseId}
+Vehicle Plate    : ${vehicle.plate}
+Node 1 Velocity  : ${vehicle.node1Speed.toFixed(1)} km/h (Enforced Limit: ${speedLimit} km/h)
+Lateral Weave    : SDLP = ${vehicle.sdlp.toFixed(2)} m | Required IRC:73 SSD = ${ssdReq} m
+Current Fine     : ₹0 (Grace Self-Rectification Window Active)
+Required Action  : Reduce speed below ${speedLimit} km/h and stabilize lane tracking before Camera Node 2 (${distLabel} ahead).`;
+
+            setViolatorDisplay(
+                'NODE 1 REAL-TIME DISPATCH — LEVEL 1 WARNING ACTIVE',
+                `Initial Violation Alert Sent to ${vehicle.plate} (${vehicle.node1Speed.toFixed(1)} km/h)`,
+                'bg-amber-600 text-white border-amber-700',
+                voice,
+                detailed
+            );
+
+            appendOrUpdateLedger(
+                vehicle.caseId,
+                vehicle.plate,
+                `${vehicle.node1Speed.toFixed(1)} km/h &rarr; ...`,
+                `<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold">L1: ALERT SENT</span>`,
+                'Monitoring Node 2 ComplianceWindow'
+            );
+        }
+
+        function triggerNode2Event() {
+            const distLabel = corridorMeters === 1000 ? '1,000 m (1 km)' : '500 m';
+
+            // Scenario 1: Self-Rectified at Node 2 -> Automatic Real-Time Rectification Notice!
+            if (vehicle.scenario === 1) {
+                const voice = `Compliance confirmed for vehicle ${vehicle.plate} at Camera Node 2. Speed reduced to ${Math.round(vehicle.node2Speed)} kilometers per hour. Your violation has been rectified with zero rupee fine.`;
+
+                const detailed =
+`[REAL-TIME RECTIFICATION CONFIRMATION — CAMERA NODE 2]
+Case ID          : ${vehicle.caseId}
+Vehicle Plate    : ${vehicle.plate}
+Node 1 -> Node 2 : ${vehicle.node1Speed.toFixed(1)} km/h -> ${vehicle.node2Speed.toFixed(1)} km/h (Limit: ${speedLimit} km/h)
+Corridor Span    : Verified across ${distLabel} Node 1-to-Node 2 segment
+Final Penalty    : ₹0 Fine | 0 Demerit Points (Closed Automatically)`;
+
+                setViolatorDisplay(
+                    'NODE 2 REAL-TIME DISPATCH — SELF-RECTIFIED (₹0 FINE)',
+                    `Rectification Notification Sent to ${vehicle.plate} — Penalty Waived`,
+                    'bg-emerald-700 text-white border-emerald-800',
+                    voice,
+                    detailed
+                );
+
+                appendOrUpdateLedger(
+                    vehicle.caseId,
+                    vehicle.plate,
+                    `${vehicle.node1Speed.toFixed(1)} &rarr; ${vehicle.node2Speed.toFixed(1)} km/h`,
+                    `<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold">L1: COMPLIED (₹0)</span>`,
+                    'Auto-Closed at Node 2 (No Node 3 Action Required)'
+                );
+            } else {
+                // Scenario 2 or 3: Not Rectified at Node 2 -> Escalate to Node 3 for Human Confirmation
+                const isExtreme = vehicle.scenario === 3;
+                const voice = `Warning ignored by vehicle ${vehicle.plate} at Camera Node 2, recorded at ${Math.round(vehicle.node2Speed)} kilometers per hour. Case forwarded to Camera Node 3 for human officer enforcement confirmation.`;
+
+                const detailed =
+`[NODE 2 NON-COMPLIANCE — FORWARDED TO NODE 3 OFFICER GATE]
+Case ID          : ${vehicle.caseId}
+Vehicle Plate    : ${vehicle.plate}
+Node 1 -> Node 2 : ${vehicle.node1Speed.toFixed(1)} km/h -> ${vehicle.node2Speed.toFixed(1)} km/h (Limit: ${speedLimit} km/h)
+Kinematic Threat : SDLP = ${vehicle.sdlp.toFixed(2)} m | TTC = ${vehicle.ttc} s | DRAC = ${vehicle.drac} m/s²
+Status           : Paused at Node 3 (${distLabel} ahead) awaiting Human Officer Confirmation.`;
+
+                setViolatorDisplay(
+                    'NODE 2 NON-COMPLIANCE — ESCALATED TO NODE 3 OFFICER GATE',
+                    `Unrectified Violation (${vehicle.node2Speed.toFixed(1)} km/h) — Awaiting Node 3 Human Confirmation`,
+                    isExtreme ? 'bg-red-700 text-white border-red-800' : 'bg-amber-700 text-white border-amber-800',
+                    voice,
+                    detailed
+                );
+
+                appendOrUpdateLedger(
+                    vehicle.caseId,
+                    vehicle.plate,
+                    `${vehicle.node1Speed.toFixed(1)} &rarr; ${vehicle.node2Speed.toFixed(1)} km/h`,
+                    `<span class="px-1.5 py-0.5 rounded bg-amber-200 text-amber-950 font-bold">PENDING NODE 3</span>`,
+                    'Awaiting Officer Verification at Node 3'
+                );
+            }
+        }
+
+        function officerConfirm(decision) {
+            setNode3Gate(false, '');
+
+            if (decision === 'LEVEL_2') {
+                const voice = `Node 3 Officer Confirmation logged for vehicle ${vehicle.plate}. Level 2 electronic challan of 2,000 rupees and 3 demerit points have been issued.`;
+                const detailed =
+`[NODE 3 HUMAN OFFICER CONFIRMED — LEVEL 2 ACTIVE PENALIZATION]
+Case ID          : ${vehicle.caseId}
+Vehicle Plate    : ${vehicle.plate}
+Node 1 -> Node 2 : ${vehicle.node1Speed.toFixed(1)} km/h -> ${vehicle.node2Speed.toFixed(1)} km/h
+Officer Decision : CONFIRMED LEVEL 2 PENALTY AT NODE 3
+Enforcement      : ₹2,000 e-Challan + 3 Demerit Points Locked to Insurance/Registration`;
+
+                setViolatorDisplay(
+                    'NODE 3 HUMAN OFFICER CONFIRMED — LEVEL 2 PENALTY ISSUED',
+                    `Level 2 e-Challan (₹2,000 + 3 Pts) Confirmed for ${vehicle.plate}`,
+                    'bg-amber-700 text-white border-amber-900',
+                    voice,
+                    detailed
+                );
+
+                appendOrUpdateLedger(
+                    vehicle.caseId,
+                    vehicle.plate,
+                    `${vehicle.node1Speed.toFixed(1)} &rarr; ${vehicle.node2Speed.toFixed(1)} km/h`,
+                    `<span class="px-1.5 py-0.5 rounded bg-amber-500 text-white font-bold">L2: CHALLAN (₹2,000)</span>`,
+                    'Officer Confirmed Level 2 at Node 3'
+                );
+            } else if (decision === 'LEVEL_3') {
+                vehicle.node3Signal = 'RED';
+                updateTelemetryStrip();
+
+                const voice = `Emergency Level 3 High-Speed Interception confirmed by Node 3 Officer for vehicle ${vehicle.plate}. Node 3 traffic signal is locked to Red and police interception unit is dispatched. Pull over immediately.`;
+                const detailed =
+`[NODE 3 HUMAN OFFICER CONFIRMED — LEVEL 3 HSIP INTERCEPTION]
+Case ID          : ${vehicle.caseId}
+Vehicle Plate    : ${vehicle.plate}
+Node 1 -> Node 2 : ${vehicle.node1Speed.toFixed(1)} km/h -> ${vehicle.node2Speed.toFixed(1)} km/h (SDLP: ${vehicle.sdlp.toFixed(2)} m)
+Officer Decision : CONFIRMED LEVEL 3 HSIP PHYSICAL INTERCEPTION
+Enforcement      : Node 3 Signal Preempted to RED | PCR Patrol Unit Dispatched | ₹10,000 Fine + 6 Pts`;
+
+                setViolatorDisplay(
+                    'NODE 3 HUMAN OFFICER CONFIRMED — LEVEL 3 HSIP INTERCEPTION',
+                    `HSIP Active: Node 3 Signal Preempted to RED + Patrol Dispatched`,
+                    'bg-red-800 text-white border-red-950',
+                    voice,
+                    detailed
+                );
+
+                appendOrUpdateLedger(
+                    vehicle.caseId,
+                    vehicle.plate,
+                    `${vehicle.node1Speed.toFixed(1)} &rarr; ${vehicle.node2Speed.toFixed(1)} km/h`,
+                    `<span class="px-1.5 py-0.5 rounded bg-red-600 text-white font-bold">L3: HSIP RED + PCR</span>`,
+                    'Officer Confirmed Level 3 HSIP at Node 3'
+                );
+            } else {
+                const voice = `Case ${vehicle.caseId} for vehicle ${vehicle.plate} has been dismissed by the Node 3 reviewing officer.`;
+                const detailed =
+`[NODE 3 HUMAN OFFICER OVERRIDE — CASE DISMISSED]
+Case ID          : ${vehicle.caseId}
+Vehicle Plate    : ${vehicle.plate}
+Officer Decision : DISMISSED AT NODE 3 (No Penalty Issued)`;
+
+                setViolatorDisplay(
+                    'NODE 3 OFFICER OVERRIDE — CASE DISMISSED',
+                    `Case Dismissed by Officer at Node 3`,
+                    'bg-slate-700 text-white border-slate-800',
+                    voice,
+                    detailed
+                );
+
+                appendOrUpdateLedger(
+                    vehicle.caseId,
+                    vehicle.plate,
+                    `${vehicle.node1Speed.toFixed(1)} &rarr; ${vehicle.node2Speed.toFixed(1)} km/h`,
+                    `<span class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 font-bold">DISMISSED</span>`,
+                    'Officer Dismissed at Node 3'
+                );
+            }
+
+            // Resume vehicle motion past Node 3 if not stopped by Red signal
+            if (decision !== 'LEVEL_3') {
+                vehicle.stage = 4;
+                animateCorridor();
+            } else {
+                drawCorridor();
+            }
+        }
+
+        function animateCorridor() {
+            if (!vehicle.active) return;
+
+            // Pause right in front of Node 3 if unrectified and waiting for officer confirmation
+            if (vehicle.stage === 3) {
+                drawCorridor();
+                return;
+            }
+
+            // Advance vehicle X position
+            const pxStep = vehicle.scenario === 3 ? 2.4 : 1.9;
+            vehicle.x += pxStep;
+
+            // Interpolate speed between Node 1 and Node 2
+            if (vehicle.x >= NODE1_X && vehicle.x <= NODE2_X) {
+                const ratio = (vehicle.x - NODE1_X) / (NODE2_X - NODE1_X);
+                vehicle.speedKmh = vehicle.node1Speed + (vehicle.node2Speed - vehicle.node1Speed) * ratio;
+            }
+
+            // Lateral DUI weave simulation on Y-axis for Scenario 3
+            if (vehicle.scenario === 3 && vehicle.x < NODE3_X - 35) {
+                vehicle.y = vehicle.baseY + Math.sin(vehicle.x * 0.08) * 18;
+            } else {
+                vehicle.y = vehicle.baseY;
+            }
+
+            // Check Node 1 crossing
+            if (vehicle.stage === 0 && vehicle.x >= NODE1_X) {
+                vehicle.stage = 1;
+                triggerNode1Event();
+            }
+
+            // Check Node 2 crossing
+            if (vehicle.stage === 1 && vehicle.x >= NODE2_X) {
+                vehicle.stage = 2;
+                triggerNode2Event();
+            }
+
+            // Check arrival at Node 3 Confirmation Gate
+            if (vehicle.stage === 2 && vehicle.x >= NODE3_X - 42) {
+                if (vehicle.scenario === 1) {
+                    // Self-rectified vehicle passes smoothly through green Node 3
+                    vehicle.stage = 4;
+                } else {
+                    // Unrectified vehicle pauses at Node 3 for Human Officer Confirmation!
+                    vehicle.stage = 3;
+                    const recText = vehicle.scenario === 3
+                        ? `Target ${vehicle.plate} recorded at ${vehicle.node1Speed.toFixed(1)} km/h (Node 1) and ${vehicle.node2Speed.toFixed(1)} km/h (Node 2) with severe DUI weaving (SDLP ${vehicle.sdlp} m). Select Officer Action below:`
+                        : `Target ${vehicle.plate} ignored Level 1 warning (${vehicle.node1Speed.toFixed(1)} km/h at Node 1 -> ${vehicle.node2Speed.toFixed(1)} km/h at Node 2). Select Officer Action below:`;
+                    setNode3Gate(true, recText);
+                    updateTelemetryStrip();
+                    drawCorridor();
+                    return;
+                }
+            }
+
+            updateTelemetryStrip();
+            drawCorridor();
+
+            if (vehicle.x < canvas.width + 40) {
+                animFrame = requestAnimationFrame(animateCorridor);
+            } else {
+                vehicle.active = false;
+            }
+        }
+
+        function drawCorridor() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Asphalt background
+            ctx.fillStyle = weatherMode === 'wet' ? '#0F172A' : '#1E293B';
+            ctx.fillRect(0, 35, canvas.width, 145);
+
+            // Road shoulders
+            ctx.strokeStyle = '#64748B';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, 35); ctx.lineTo(canvas.width, 35);
+            ctx.moveTo(0, 180); ctx.lineTo(canvas.width, 180);
+            ctx.stroke();
+
+            // IRC:35 Center Dashed Line (3.0m dash + 4.5m gap representation)
+            ctx.strokeStyle = '#CBD5E1';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([18, 24]);
+            ctx.beginPath();
+            ctx.moveTo(0, 108);
+            ctx.lineTo(canvas.width, 108);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            const distLabel = corridorMeters === 1000 ? '1,000 m (1 km)' : '500 m';
+
+            // Distance dimension arrows between nodes
+            ctx.fillStyle = '#94A3B8';
+            ctx.font = 'bold 11px monospace';
+            ctx.fillText(`<--- ${distLabel} --->`, (NODE1_X + NODE2_X) / 2 - 55, 22);
+            ctx.fillText(`<--- ${distLabel} --->`, (NODE2_X + NODE3_X) / 2 - 55, 22);
+
+            // Helper to draw each Gantry Node
+            function drawGantry(x, label, sublabel, color) {
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(x, 35);
+                ctx.lineTo(x, 180);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.fillStyle = '#0F172A';
+                ctx.fillRect(x - 62, 184, 124, 26);
+                ctx.strokeStyle = color;
+                ctx.strokeRect(x - 62, 184, 124, 26);
+
+                ctx.fillStyle = color;
+                ctx.font = 'bold 10px sans-serif';
+                ctx.fillText(label, x - 54, 196);
+                ctx.fillStyle = '#CBD5E1';
+                ctx.font = '9px monospace';
+                ctx.fillText(sublabel, x - 54, 206);
+            }
+
+            drawGantry(NODE1_X, 'NODE 1: DETECTION', 'Auto RTVN Alert (0m)', '#38BDF8');
+            drawGantry(NODE2_X, 'NODE 2: VERIFY', `Auto Check (${corridorMeters}m)`, '#FBBF24');
+            const n3Color = vehicle.node3Signal === 'RED' ? '#EF4444' : '#10B981';
+            drawGantry(NODE3_X, 'NODE 3: OFFICER GATE', `Human Confirm (${corridorMeters * 2}m)`, n3Color);
+
+            // Draw Traffic Signal Light at Node 3
+            ctx.fillStyle = vehicle.node3Signal === 'RED' ? '#EF4444' : '#10B981';
+            ctx.beginPath();
+            ctx.arc(NODE3_X, 24, 7, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw Active Vehicle with Bounding Box
+            if (vehicle.active || vehicle.stage === 3) {
+                const isViolating = vehicle.speedKmh > speedLimit || vehicle.sdlp >= 0.45;
+                const boxColor = isViolating ? '#EF4444' : '#10B981';
+
+                // Vehicle body
+                ctx.fillStyle = '#F8FAFC';
+                ctx.fillRect(vehicle.x - 22, vehicle.y - 12, 44, 24);
+
+                // AI Homography Bounding Box
+                ctx.strokeStyle = boxColor;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(vehicle.x - 26, vehicle.y - 16, 52, 32);
+
+                // Telemetry tag above vehicle
+                ctx.fillStyle = '#0F172A';
+                ctx.fillRect(vehicle.x - 48, vehicle.y - 36, 98, 17);
+                ctx.strokeStyle = boxColor;
+                ctx.lineWidth = 1;
+                ctx.strokeRect(vehicle.x - 48, vehicle.y - 36, 98, 17);
+
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 10px monospace';
+                ctx.fillText(`${vehicle.speedKmh.toFixed(0)} km/h | ${vehicle.plate.slice(-4)}`, vehicle.x - 43, vehicle.y - 24);
+            }
+        }
+
+        // Initial render and preload 1 sample row
+        window.addEventListener('DOMContentLoaded', () => {
+            updateCorridorConfig();
+            updateWeatherConfig();
+            startScenario(1);
+        });
+    </script>
+</body>
+</html>
