@@ -1,0 +1,50 @@
+[
+  {
+    "case_id": "HET-2026-1001",
+    "plate": "GJ-01-HX-4821",
+    "scenario": 1,
+    "weather_mode": "dry",
+    "corridor_meters": 500,
+    "node1_speed_kmh": 76.4,
+    "node2_speed_kmh": 52.0,
+    "sdlp_meters": 0.11,
+    "ttc_seconds": 3.9,
+    "drac_mps2": 1.1,
+    "status": "self_rectified",
+    "officer_action": "auto_closed",
+    "risk_score": 41,
+    "severity": "warning"
+  },
+  {
+    "case_id": "HET-2026-1002",
+    "plate": "GJ-01-KP-9012",
+    "scenario": 2,
+    "weather_mode": "dry",
+    "corridor_meters": 500,
+    "node1_speed_kmh": 78.5,
+    "node2_speed_kmh": 84.2,
+    "sdlp_meters": 0.24,
+    "ttc_seconds": 2.3,
+    "drac_mps2": 2.6,
+    "status": "pending_officer",
+    "officer_action": "awaiting_decision",
+    "risk_score": 68,
+    "severity": "warning"
+  },
+  {
+    "case_id": "HET-2026-1003",
+    "plate": "GJ-27-TC-7740",
+    "scenario": 3,
+    "weather_mode": "wet",
+    "corridor_meters": 1000,
+    "node1_speed_kmh": 108.0,
+    "node2_speed_kmh": 111.5,
+    "sdlp_meters": 0.61,
+    "ttc_seconds": 1.1,
+    "drac_mps2": 5.4,
+    "status": "level_3_hsip",
+    "officer_action": "red_signal_locked",
+    "risk_score": 91,
+    "severity": "danger"
+  }
+]
