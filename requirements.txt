@@ -1,0 +1,10 @@
+# RTVN & HSIP - demo requirements
+# Developed by Het Prajapati
+# © 2026 Het Prajapati. All Rights Reserved.
+#
+# This front-end prototype is static and does not require any external Python packages.
+# A standard Python 3.x installation is enough to serve the app locally using:
+#   python -m http.server 8000
+#
+# For reference only:
+# python>=3.10
