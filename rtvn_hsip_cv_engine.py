@@ -1,11 +1,14 @@
 """
-RTVN & HSIP — Preemptive AI Traffic Policy Enforcement & Telemetry Engine
-System Architecture & Engineering by Het Prajapati ((c) 2026 Het Prajapati)
-Developed for Viksit Bharat Young Leaders Dialogue (VBYLD) 2027
+===============================================================================
+PROJECT: RTVN & HSIP — Preemptive AI Traffic Policy Enforcement & Telemetry Engine
+ARCHITECTURE: 3-Node Preemptive Corridor, IRC:35 Homography & IRC:73 Physics
+COPYRIGHT: (c) 2026 Het Prajapati. All Rights Reserved.
+AUTHOR: Het Prajapati — System Architecture, Civil Engineering Modeling & AI Engine
+LICENSE: MIT License
+===============================================================================
 """
 
 import argparse
-import asyncio
 import hashlib
 import json
 import logging
@@ -13,12 +16,12 @@ import math
 import os
 import time
 from dataclasses import dataclass, asdict
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import cv2
 import numpy as np
 
-# Optional Deep Learning & WebSocket dependencies with graceful fallback
+# Optional Deep Learning (YOLOv8) & FastAPI WebSocket dependencies with safe fallback
 try:
     from ultralytics import YOLO
     YOLO_AVAILABLE = True
@@ -33,7 +36,6 @@ try:
 except ImportError:
     FASTAPI_AVAILABLE = False
 
-# Configure Production Logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(message)s",
@@ -52,22 +54,21 @@ class IRCPhysicsEngine:
     and IRC:73 Stopping Sight Distance (SSD) weather-adaptive braking physics.
     """
     def __init__(self, weather_mode: str = "DRY"):
-        self.reaction_time_s = 2.5  # IRC:73 standard driver reaction time (t_r)
+        self.reaction_time_s = 2.5  # IRC:73 standard reaction time (t_r = 2.5s)
         self.homography_matrix = self._calibrate_irc35_homography()
         self.set_weather_mode(weather_mode)
 
     def _calibrate_irc35_homography(self) -> np.ndarray:
         """
-        Maps 4 perspective CCTV pixel coordinates to a flat top-down
-        real-world metric plane (meters) using IRC:35 lane geometry:
-        - Standard urban 2-lane width: 7.0 meters (3.5m per lane)
-        - 4 consecutive IRC:35 cycles (3.0m dash + 4.5m gap): 30.0 meters
+        Maps 4 perspective CCTV pixel coordinates to a flat top-down metric plane:
+        - Standard 2-lane urban carriageway width: 7.0 meters
+        - 4 consecutive IRC:35 cycles (3.0m dash + 4.5m gap = 7.5m): 30.0 meters
         """
         src_pixels = np.float32([
-            [420, 220],   # Top-Left (Far lane edge)
-            [860, 220],   # Top-Right (Far right edge)
-            [1180, 680],  # Bottom-Right (Near right edge)
-            [100, 680]    # Bottom-Left (Near left edge)
+            [420, 220],   # Top-Left (Far left lane edge)
+            [860, 220],   # Top-Right (Far right lane edge)
+            [1180, 680],  # Bottom-Right (Near right lane edge)
+            [100, 680]    # Bottom-Left (Near left lane edge)
         ])
         dst_meters = np.float32([
             [0.0, 0.0],
@@ -79,7 +80,7 @@ class IRCPhysicsEngine:
 
     def pixel_to_ground_meters(self, px_x: float, px_y: float) -> Tuple[float, float]:
         """
-        Transforms a 2D pixel coordinate (specifically the tire-asphalt contact point)
+        Transforms the tire-asphalt contact point (bottom-center of bounding box)
         into real-world ground-plane coordinates (X_meters, Y_meters).
         """
         pt = np.array([[[px_x, px_y]]], dtype=np.float32)
@@ -89,17 +90,14 @@ class IRCPhysicsEngine:
     def set_weather_mode(self, mode: str) -> None:
         self.weather_mode = mode.upper()
         if self.weather_mode == "MONSOON":
-            self.friction_f = 0.18  # Wet pavement longitudinal skid resistance
+            self.friction_f = 0.18
             self.enforced_speed_limit_kmh = 42.0
         else:
-            self.friction_f = 0.35  # Dry asphalt longitudinal skid resistance
+            self.friction_f = 0.35
             self.enforced_speed_limit_kmh = 60.0
 
     def compute_irc73_ssd(self, velocity_kmh: float, gradient_pct: float = 0.0) -> float:
-        """
-        IRC:73 Stopping Sight Distance Formula:
-        SSD = 0.278 * v * t_r + (v^2) / (254 * (f +/- 0.01 * S))
-        """
+        """SSD = 0.278 * v * t_r + (v^2) / (254 * (f +/- 0.01 * S))"""
         v = max(0.0, velocity_kmh)
         lag_distance = 0.278 * v * self.reaction_time_s
         effective_f = max(0.05, self.friction_f + (0.01 * gradient_pct))
@@ -108,11 +106,7 @@ class IRCPhysicsEngine:
 
     @staticmethod
     def compute_sdlp(lateral_x_history_m: List[float]) -> float:
-        """
-        Computes Standard Deviation of Lateral Position (SDLP) in meters
-        to mathematically quantify DUI / erratic lane weaving.
-        Threshold: SDLP >= 0.45m indicates severe lateral instability.
-        """
+        """Standard Deviation of Lateral Position (SDLP) in meters for DUI weave detection."""
         if len(lateral_x_history_m) < 2:
             return 0.0
         return round(float(np.std(lateral_x_history_m, ddof=1)), 3)
@@ -123,10 +117,7 @@ class IRCPhysicsEngine:
         v_lead_kmh: float,
         gap_meters: float
     ) -> Tuple[float, float]:
-        """
-        Computes Time-to-Collision (TTC in seconds) and
-        Deceleration Rate to Avoid a Crash (DRAC in m/s^2).
-        """
+        """Computes Time-to-Collision (TTC) and Deceleration Rate to Avoid a Crash (DRAC)."""
         v_fol_ms = v_following_kmh / 3.6
         v_lead_ms = v_lead_kmh / 3.6
         effective_gap = max(0.5, gap_meters)
@@ -145,11 +136,7 @@ class IRCPhysicsEngine:
 # =====================================================================
 
 def generate_bsa_section63_hash(payload: Dict) -> str:
-    """
-    Generates an immutable 64-character SHA-256 hash of the telemetry record
-    for electronic evidence admissibility under Section 63 of the
-    Bharatiya Sakshya Adhiniyam (BSA), 2023.
-    """
+    """Generates an immutable SHA-256 hash under Section 63 of the Bharatiya Sakshya Adhiniyam 2023."""
     canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
@@ -162,9 +149,9 @@ def generate_bsa_section63_hash(payload: Dict) -> str:
 class CorridorCaseRecord:
     case_id: str
     plate_number: str
-    corridor_type: str          # "URBAN_500M" or "HIGHWAY_1KM"
-    node_spacing_m: int         # 500 or 1000
-    weather_mode: str           # "DRY" or "MONSOON"
+    corridor_type: str
+    node_spacing_m: int
+    weather_mode: str
     speed_limit_kmh: float
     node1_speed_kmh: float
     node2_speed_kmh: float
@@ -207,24 +194,20 @@ class ThreeNodeEnforcementEngine:
         )
         ssd = self.physics.compute_irc73_ssd(node2_speed)
 
-        # Node 1 Evaluation (0m)
         if node1_speed > limit or sdlp >= 0.45:
             node1_action = "RTVN_VOICE_TTS_AND_WRITTEN_NOTICE_DISPATCHED"
         else:
             node1_action = "COMPLIANT_AT_NODE_1"
 
-        # Node 2 Evaluation (500m / 1000m) -> Automated Rectification Check
         is_extreme_hazard = (node2_speed >= 90.0) or (sdlp >= 0.45) or (ttc < 1.5)
 
         if node2_speed <= limit and sdlp < 0.45:
-            # LEVEL 1: Driver heeded Node 1 warning and slowed down
             node2_status = "SELF_RECTIFIED_AT_NODE_2"
             node3_decision = "AUTO_CLOSED_LEVEL_1_COMPLIED"
             fine = 0
             points = 0
             signal_state = "NORMAL_GREEN_WAVE"
         else:
-            # Driver ignored warning -> Escalate to Node 3 Human Officer Gate
             node2_status = "WARNING_IGNORED_ESCALATED_TO_NODE_3"
             if officer_action_at_node3 == "DISMISS":
                 node3_decision = "OFFICER_DISMISSED_EXEMPT_VEHICLE"
@@ -266,7 +249,6 @@ class ThreeNodeEnforcementEngine:
             timestamp_utc=ts
         )
 
-        # Compute BSA 2023 Section 63 Hash over all fields except the hash itself
         hash_dict = asdict(record)
         hash_dict.pop("bsa_sec63_sha256", None)
         record.bsa_sec63_sha256 = generate_bsa_section63_hash(hash_dict)
@@ -276,52 +258,39 @@ class ThreeNodeEnforcementEngine:
 
 
 # =====================================================================
-# 4. REAL YOLOv8 + BYTETRACK + HOMOGRAPHY LIVE STREAM ENGINE
+# 4. LIVE YOLOv8 + BYTETRACK + IRC:35 HOMOGRAPHY CAMERA TRACKER
 # =====================================================================
 
 def run_live_cv_tracker(video_source: str = "0", weather: str = "DRY") -> None:
-    """
-    Runs real-time vehicle tracking using YOLOv8 + ByteTrack (if installed)
-    and computes true real-world velocity (km/h) and SDLP (m) using the
-    IRC:35 Perspective Homography Matrix on the tire-road contact point.
-    """
     physics = IRCPhysicsEngine(weather_mode=weather)
     src = 0 if video_source == "0" else video_source
     cap = cv2.VideoCapture(src)
 
     if not cap.isOpened():
-        logger.error(f"Could not open video source '{video_source}'. Check camera index or file path.")
+        logger.error(f"Could not open video source '{video_source}'.")
         return
-
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    if fps <= 0 or math.isnan(fps):
-        fps = 30.0
 
     model = None
     if YOLO_AVAILABLE:
-        logger.info("Loading YOLOv8n + ByteTrack weights for real-time vehicle tracking...")
+        logger.info("Loading YOLOv8n + ByteTrack for vehicle detection...")
         model = YOLO("yolov8n.pt")
     else:
-        logger.warning("Ultralytics YOLOv8 not installed. Falling back to OpenCV motion contours.")
+        logger.warning("Ultralytics YOLOv8 not found; using OpenCV motion contours with IRC:35 homography.")
         bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=300, varThreshold=40)
 
-    # Track history: track_id -> list of (timestamp, X_meters, Y_meters)
     track_history: Dict[int, List[Tuple[float, float, float]]] = {}
-
     logger.info("Live CV Stream started. Press [W] for Monsoon, [D] for Dry, [Q] to Quit.")
 
     while True:
         ret, frame = cap.read()
         if not ret:
-            logger.info("End of video stream reached.")
             break
 
         frame = cv2.resize(frame, (1280, 720))
         now = time.time()
-        detections: List[Tuple[int, int, int, int, int]] = []  # (track_id, x1, y1, x2, y2)
+        detections: List[Tuple[int, int, int, int, int]] = []
 
         if YOLO_AVAILABLE and model is not None:
-            # COCO classes: 2=car, 3=motorcycle, 5=bus, 7=truck
             results = model.track(frame, persist=True, classes=[2, 3, 5, 7], verbose=False)
             if results and results[0].boxes.id is not None:
                 boxes = results[0].boxes.xyxy.cpu().numpy().astype(int)
@@ -329,7 +298,6 @@ def run_live_cv_tracker(video_source: str = "0", weather: str = "DRY") -> None:
                 for box, track_id in zip(boxes, ids):
                     detections.append((int(track_id), box[0], box[1], box[2], box[3]))
         else:
-            # Fallback contour tracker
             fg_mask = bg_subtractor.apply(frame)
             contours, _ = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             for idx, cnt in enumerate(contours):
@@ -338,17 +306,14 @@ def run_live_cv_tracker(video_source: str = "0", weather: str = "DRY") -> None:
                     detections.append((idx + 1, x, y, x + w, y + h))
 
         for track_id, x1, y1, x2, y2 in detections:
-            # CRITICAL CV PRINCIPLE: Use tire-asphalt contact point (bottom-center) for homography
+            # Tire-road contact point (bottom-center pixel) eliminates 3D parallax error
             tire_px_x = (x1 + x2) / 2.0
             tire_px_y = float(y2)
-
             xm, ym = physics.pixel_to_ground_meters(tire_px_x, tire_px_y)
 
             if track_id not in track_history:
                 track_history[track_id] = []
             track_history[track_id].append((now, xm, ym))
-
-            # Keep last 15 frames of history
             if len(track_history[track_id]) > 15:
                 track_history[track_id].pop(0)
 
@@ -358,88 +323,60 @@ def run_live_cv_tracker(video_source: str = "0", weather: str = "DRY") -> None:
             if len(hist) >= 3:
                 dt = hist[-1][0] - hist[0][0]
                 if dt > 0.05:
-                    dx = hist[-1][1] - hist[0][1]
-                    dy = hist[-1][2] - hist[0][2]
-                    dist_m = math.hypot(dx, dy)
+                    dist_m = math.hypot(hist[-1][1] - hist[0][1], hist[-1][2] - hist[0][2])
                     speed_kmh = round(min(max((dist_m / dt) * 3.6, 0.0), 160.0), 1)
                     sdlp_m = physics.compute_sdlp([pt[1] for pt in hist])
 
-            # Determine escalation color
             limit = physics.enforced_speed_limit_kmh
             if speed_kmh >= 90.0 or sdlp_m >= 0.45:
-                color = (0, 0, 255)      # Red: Level 3 HSIP
-                status = "L3 HSIP INTERCEPT"
+                color, status = (0, 0, 255), "L3 HSIP INTERCEPT"
             elif speed_kmh > limit:
-                color = (0, 165, 255)    # Orange: Level 1/2 Warning
-                status = "RTVN SPEED ALERT"
+                color, status = (0, 165, 255), "RTVN SPEED ALERT"
             else:
-                color = (0, 220, 0)      # Green: Compliant
-                status = "COMPLIANT"
+                color, status = (0, 220, 0), "COMPLIANT"
 
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
             label = f"ID:{track_id} | {speed_kmh} km/h | SDLP:{sdlp_m:.2f}m | {status}"
             cv2.putText(frame, label, (x1, max(25, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
 
-        # HUD Banner
         hud = f"IRC:73 Mode: {physics.weather_mode} (f={physics.friction_f}) | Enforced Limit: {physics.enforced_speed_limit_kmh} km/h"
         cv2.putText(frame, hud, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
-
         cv2.imshow("RTVN & HSIP Live Homography CV Engine — Het Prajapati", frame)
+
         key = cv2.waitKey(1) & 0xFF
         if key == ord("q"):
             break
         elif key == ord("w"):
             physics.set_weather_mode("MONSOON")
-            logger.info("Switched to MONSOON physics (f=0.18, Limit=42 km/h)")
         elif key == ord("d"):
             physics.set_weather_mode("DRY")
-            logger.info("Switched to DRY ASPHALT physics (f=0.35, Limit=60 km/h)")
 
     cap.release()
     cv2.destroyAllWindows()
 
 
 # =====================================================================
-# 5. DIAGNOSTIC SUITE & FASTAPI WEBSOCKET SERVER FOR INDEX.HTML
+# 5. DIAGNOSTIC SUITE & FASTAPI WEBSOCKET SERVER
 # =====================================================================
 
 def run_diagnostic_suite() -> List[Dict]:
     physics = IRCPhysicsEngine("DRY")
     engine = ThreeNodeEnforcementEngine(physics)
 
-    # Scenario 1: 500m Urban Corridor — Level 1 Self-Rectification
     s1 = engine.evaluate_corridor_traversal(
-        case_id="RTVN-2026-001",
-        plate="GJ-01-HX-4821",
-        corridor_type="URBAN_500M",
-        node1_speed=76.4,
-        node2_speed=52.0,
-        lateral_positions_m=[1.75, 1.78, 1.74, 1.76, 1.75]
+        case_id="RTVN-2026-001", plate="GJ-01-HX-4821", corridor_type="URBAN_500M",
+        node1_speed=76.4, node2_speed=52.0, lateral_positions_m=[1.75, 1.78, 1.74, 1.76, 1.75]
     )
-
-    # Scenario 2: 500m Urban Corridor — Level 2 Persistent Violator
     s2 = engine.evaluate_corridor_traversal(
-        case_id="RTVN-2026-002",
-        plate="GJ-01-KP-9012",
-        corridor_type="URBAN_500M",
-        node1_speed=78.5,
-        node2_speed=84.2,
-        lateral_positions_m=[1.80, 1.88, 1.75, 1.83, 1.79],
+        case_id="RTVN-2026-002", plate="GJ-01-KP-9012", corridor_type="URBAN_500M",
+        node1_speed=78.5, node2_speed=84.2, lateral_positions_m=[1.80, 1.88, 1.75, 1.83, 1.79],
         officer_action_at_node3="CONFIRM_LEVEL_2"
     )
-
-    # Scenario 3: 1km Highway Corridor (Monsoon) — Level 3 HSIP Extreme/DUI
     physics.set_weather_mode("MONSOON")
     s3 = engine.evaluate_corridor_traversal(
-        case_id="HSIP-2026-003",
-        plate="GJ-27-TC-7740",
-        corridor_type="HIGHWAY_1KM",
-        node1_speed=108.0,
-        node2_speed=111.5,
-        lateral_positions_m=[1.10, 2.35, 0.95, 2.55, 1.20],
-        lead_vehicle_speed_kmh=45.0,
-        lead_vehicle_gap_m=19.0,
-        officer_action_at_node3="CONFIRM_LEVEL_3"
+        case_id="HSIP-2026-003", plate="GJ-27-TC-7740", corridor_type="HIGHWAY_1KM",
+        node1_speed=108.0, node2_speed=111.5, lateral_positions_m=[1.10, 2.35, 0.95, 2.55, 1.20],
+        lead_vehicle_speed_kmh=45.0, lead_vehicle_gap_m=19.0, officer_action_at_node3="CONFIRM_LEVEL_3"
     )
 
     records = [asdict(s1), asdict(s2), asdict(s3)]
@@ -469,10 +406,7 @@ def start_websocket_bridge(port: int = 8000) -> None:
 
     app = FastAPI(title="RTVN & HSIP Real-Time Telemetry API")
     app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
+        CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
     )
 
     @app.get("/api/telemetry")
@@ -482,7 +416,7 @@ def start_websocket_bridge(port: int = 8000) -> None:
     @app.websocket("/ws/telemetry")
     async def websocket_endpoint(websocket: WebSocket):
         await websocket.accept()
-        logger.info("Frontend Dashboard connected via WebSocket!")
+        logger.info("Frontend Web Dashboard connected via WebSocket!")
         records = run_diagnostic_suite()
         try:
             await websocket.send_json({"type": "INITIAL_SYNC", "records": records})
@@ -492,16 +426,16 @@ def start_websocket_bridge(port: int = 8000) -> None:
                 if msg.get("action") == "VERIFY_SCENARIO":
                     await websocket.send_json({"type": "VERIFIED_ACK", "records": records})
         except WebSocketDisconnect:
-            logger.info("Frontend Dashboard disconnected.")
+            logger.info("Frontend Web Dashboard disconnected.")
 
-    logger.info(f"Starting Live FastAPI WebSocket Bridge on ws://localhost:{port}/ws/telemetry")
+    logger.info(f"Starting FastAPI WebSocket Bridge on ws://127.0.0.1:{port}/ws/telemetry")
     uvicorn.run(app, host="127.0.0.1", port=port)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="RTVN & HSIP Computer Vision & Telemetry Engine")
     parser.add_argument("--mode", choices=["diagnostic", "live", "server"], default="diagnostic",
-                        help="Run mode: diagnostic (default), live (webcam/video CV), or server (FastAPI bridge)")
+                        help="diagnostic (default), live (webcam/video CV), or server (FastAPI bridge)")
     parser.add_argument("--source", default="0", help="Webcam index (0) or path to .mp4 traffic video")
     parser.add_argument("--weather", choices=["DRY", "MONSOON"], default="DRY", help="IRC:73 pavement condition")
     args = parser.parse_args()
